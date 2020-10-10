@@ -139,6 +139,9 @@ const serverlessConfiguration: Serverless = {
         },
       ],
     },
+    SendUploadNotifications: {
+      handler: 'src/lambda/s3/sendNotifications.handler'
+    }
   },
   resources: {
     Resources: {
@@ -221,6 +224,14 @@ const serverlessConfiguration: Serverless = {
         Type: 'AWS::S3::Bucket',
         Properties: {
           BucketName: '${self:provider.environment.IMAGES_S3_BUCKET}',
+          NotificationConfiguration: {
+            LambdaConfigurations: [
+              {
+                Event: 's3:ObjectCreated:*',
+                Function: { 'Fn::GetAtt' : [ 'SendUploadNotificationsLambdaFunction', 'Arn' ] }
+              }
+            ]
+          },
           CorsConfiguration: {
             CorsRules: [
               {
@@ -232,6 +243,16 @@ const serverlessConfiguration: Serverless = {
             ],
           },
         },
+      },
+      SendUploadNotificationsPermission: {
+        Type: 'AWS::Lambda::Permission',
+        Properties: {
+          FunctionName: { Ref: 'SendUploadNotificationsLambdaFunction' },
+          Principal: 's3.amazonaws.com',
+          Action: 'lambda:InvokeFunction',
+          SourceAccount: { Ref: 'AWS::AccountId' },
+          SourceArn: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}'
+        }
       },
       BucketPolicy: {
         Type: 'AWS::S3::BucketPolicy',
