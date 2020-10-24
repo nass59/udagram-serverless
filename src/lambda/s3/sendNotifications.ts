@@ -1,4 +1,4 @@
-import { S3Handler, S3Event } from 'aws-lambda'
+import { S3Event, SNSHandler, SNSEvent } from 'aws-lambda'
 import 'source-map-support/register'
 import * as AWS from 'aws-sdk'
 
@@ -9,23 +9,37 @@ const stage = process.env.STAGE
 const apiId = process.env.API_ID
 
 const connectionParams = {
-  apiVersion: "2018-11-29",
-  endpoint: `${apiId}.execute-api.eu-west-3.amazonaws.com/${stage}`
+  apiVersion: '2018-11-29',
+  endpoint: `${apiId}.execute-api.eu-west-3.amazonaws.com/${stage}`,
 }
 
 const apiGateway = new AWS.ApiGatewayManagementApi(connectionParams)
 
-export const handler: S3Handler = async (event: S3Event) => {
-  for (const record of event.Records) {
+export const handler: SNSHandler = async (event: SNSEvent) => {
+  console.log('Processing SNS eevnt ', JSON.stringify(event))
+
+  for (const snsRecord of event.Records) {
+    const s3EventStr = snsRecord.Sns.Message
+    console.log('Processing S3 event', s3EventStr)
+    const s3Event = JSON.parse(s3EventStr)
+
+    await processS3Event(s3Event)
+  }
+}
+
+async function processS3Event(s3Event: S3Event) {
+  for (const record of s3Event.Records) {
     const key = record.s3.object.key
     console.log('Processing S3 item with key:', key)
 
-    const connections = await docClient.scan({
-      TableName: connectionsTable
-    }).promise()
+    const connections = await docClient
+      .scan({
+        TableName: connectionsTable,
+      })
+      .promise()
 
     const payload = {
-      imageId: key
+      imageId: key,
     }
 
     for (const connection of connections.Items) {
@@ -39,22 +53,26 @@ async function sendMessageToClient(connectionId, payload) {
   try {
     console.log('Sending message to a connection', connectionId)
 
-    await apiGateway.postToConnection({
-      ConnectionId: connectionId,
-      Data: JSON.stringify(payload)
-    }).promise()
-  } catch(e) {
+    await apiGateway
+      .postToConnection({
+        ConnectionId: connectionId,
+        Data: JSON.stringify(payload),
+      })
+      .promise()
+  } catch (e) {
     console.log('Failed to send a message', JSON.stringify(e))
 
     if (e.statusCode === 410) {
       console.log('Stale connection')
 
-      await docClient.delete({
-        TableName: connectionsTable,
-        Key: {
-          id: connectionId
-        }
-      }).promise()
+      await docClient
+        .delete({
+          TableName: connectionsTable,
+          Key: {
+            id: connectionId,
+          },
+        })
+        .promise()
     }
   }
 }
