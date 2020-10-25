@@ -1,4 +1,8 @@
-import { APIGatewayProxyHandler, APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda'
+import {
+  APIGatewayProxyHandler,
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult,
+} from 'aws-lambda'
 import 'source-map-support/register'
 import * as AWS from 'aws-sdk'
 
@@ -8,20 +12,22 @@ const connectionsTable = process.env.CONNECTIONS_TABLE
 export const handler: APIGatewayProxyHandler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-    console.log('Websocket disconnect', event)
+  console.log('Websocket disconnect', event)
 
-    const connectionId = event.requestContext.connectionId
-    const key = {
-      id: connectionId
-    }
+  const connectionId = event.requestContext.connectionId
+  const key = {
+    id: connectionId,
+  }
 
-    await docClient.delete({
+  await docClient
+    .delete({
       TableName: connectionsTable,
-      Key: key
-    }).promise()
+      Key: key,
+    })
+    .promise()
 
   return {
     statusCode: 200,
-    body: ''
+    body: '',
   }
 }
